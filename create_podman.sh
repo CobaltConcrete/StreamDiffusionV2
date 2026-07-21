@@ -94,6 +94,11 @@ RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.s
     && bash /tmp/miniconda.sh -b -p /opt/conda \
     && rm /tmp/miniconda.sh
 
+# Anaconda now requires explicit ToS acceptance for its default channels
+# before conda will operate on them non-interactively.
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+    && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
 RUN conda create -n streamdiffusionv2 python=3.10 -y
 
 SHELL ["conda", "run", "--no-capture-output", "-n", "streamdiffusionv2", "/bin/bash", "-c"]
