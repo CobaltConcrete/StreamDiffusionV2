@@ -64,13 +64,14 @@ FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     CUDA_HOME=/usr/local/cuda \
-    PATH=/opt/conda/bin:/usr/local/cuda/bin:$PATH \
-    TMPDIR=/root/.cache/pip-tmp
+    PATH=/opt/conda/bin:/usr/local/cuda/bin:$PATH
 
-# TMPDIR above is read by every RUN from here on (including apt/dpkg via
-# mktemp) -- it must exist before the very first RUN or dpkg postinst
-# scripts that shell out to mktemp (e.g. ca-certificates) fail.
-RUN mkdir -p "${TMPDIR}"
+# NOTE: deliberately no global ENV TMPDIR here. TMPDIR is read by every RUN
+# command via mktemp -- including apt/dpkg postinst scripts (ca-certificates'
+# postinst uses it) -- so setting it globally can break totally unrelated
+# steps if the directory doesn't happen to exist yet at that point in the
+# build. It's set locally, only on the one command that actually needs it,
+# further down.
 
 # ca-certificates' postinst (update-ca-certificates) is the flaky part in
 # minimal container base images -- isolate it and recover from a failed
@@ -104,8 +105,13 @@ RUN pip install --no-cache-dir streamdiffusionv2 ninja packaging
 
 # nvcc from the base image + CUDA_HOME above lets flash-attn's setup.py
 # generate build metadata; it then auto-downloads a prebuilt wheel matching
-# torch2.6+cu124+cp310 instead of compiling from source.
-RUN pip install --no-cache-dir "streamdiffusionv2[flash-attn]" --no-build-isolation
+# torch2.6+cu124+cp310 instead of compiling from source. TMPDIR is scoped to
+# just this command (see note above ENV) and pointed at a dir on the same
+# filesystem as pip's wheel cache (~/.cache/pip), to dodge an
+# `Invalid cross-device link` bug in flash-attn's setup.py if the build's
+# temp dir and the wheel cache ever end up on different mounts.
+RUN mkdir -p /root/.cache/pip-tmp \
+    && TMPDIR=/root/.cache/pip-tmp pip install --no-cache-dir "streamdiffusionv2[flash-attn]" --no-build-isolation
 
 # Drop back to a normal shell for CMD/entrypoint purposes.
 SHELL ["/bin/bash", "-c"]
