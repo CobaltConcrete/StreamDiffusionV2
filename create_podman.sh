@@ -67,6 +67,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/conda/bin:/usr/local/cuda/bin:$PATH \
     TMPDIR=/root/.cache/pip-tmp
 
+# TMPDIR above is read by every RUN from here on (including apt/dpkg via
+# mktemp) -- it must exist before the very first RUN or dpkg postinst
+# scripts that shell out to mktemp (e.g. ca-certificates) fail.
+RUN mkdir -p "${TMPDIR}"
+
 # ca-certificates' postinst (update-ca-certificates) is the flaky part in
 # minimal container base images -- isolate it and recover from a failed
 # trigger instead of letting it abort the whole layer.
@@ -91,8 +96,6 @@ RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.s
 RUN conda create -n streamdiffusionv2 python=3.10 -y
 
 SHELL ["conda", "run", "--no-capture-output", "-n", "streamdiffusionv2", "/bin/bash", "-c"]
-
-RUN mkdir -p "${TMPDIR}"
 
 # streamdiffusionv2 pulls torch==2.6.0, which resolves to the cu124 wheel on
 # PyPI for linux -- correct for Ada (RTX 4090), do not add the Blackwell
