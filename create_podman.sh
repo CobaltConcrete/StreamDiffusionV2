@@ -101,7 +101,14 @@ RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkg
 
 RUN conda create -n streamdiffusionv2 python=3.10 -y
 
-SHELL ["conda", "run", "--no-capture-output", "-n", "streamdiffusionv2", "/bin/bash", "-c"]
+# NOTE: deliberately not using the Dockerfile SHELL instruction to "activate"
+# the env -- podman's default OCI image format silently ignores SHELL
+# (`SHELL is not supported for OCI image format ... will be ignored`), which
+# means every RUN after it quietly falls back to the system python/pip
+# instead of the conda env's, with no build error to flag it. Putting the
+# env's bin/ at the front of PATH works identically on podman (any format)
+# and docker, and needs no shell wrapping at all.
+ENV PATH=/opt/conda/envs/streamdiffusionv2/bin:$PATH
 
 # streamdiffusionv2 pulls torch==2.6.0, which resolves to the cu124 wheel on
 # PyPI for linux -- correct for Ada (RTX 4090), do not add the Blackwell
@@ -118,8 +125,6 @@ RUN pip install --no-cache-dir streamdiffusionv2 ninja packaging
 RUN mkdir -p /root/.cache/pip-tmp \
     && TMPDIR=/root/.cache/pip-tmp pip install --no-cache-dir "streamdiffusionv2[flash-attn]" --no-build-isolation
 
-# Drop back to a normal shell for CMD/entrypoint purposes.
-SHELL ["/bin/bash", "-c"]
 RUN echo "conda activate streamdiffusionv2" >> /root/.bashrc
 
 WORKDIR /workspace
