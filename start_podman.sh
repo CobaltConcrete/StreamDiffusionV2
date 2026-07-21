@@ -3,7 +3,7 @@
 # with GPU access and the repo / checkpoints bind-mounted in.
 #
 # Usage:
-#   ./start_podman.sh                 # interactive shell (conda env pre-activated)
+#   ./start_podman.sh                 # interactive shell
 #   ./start_podman.sh ./run_v2v.sh single   # run a command directly
 set -euo pipefail
 
@@ -53,4 +53,4 @@ exec podman run -it --rm \
   -v "${DATA_DIR}/outputs:/workspace/outputs:Z" \
   -w /workspace \
   "${IMAGE}" \
-  conda run --no-capture-output -n streamdiffusionv2 "${@:-bash}"
+  "${@:-bash}"
