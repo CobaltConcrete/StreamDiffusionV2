@@ -67,8 +67,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/conda/bin:/usr/local/cuda/bin:$PATH \
     TMPDIR=/root/.cache/pip-tmp
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      wget ca-certificates git ffmpeg \
+# ca-certificates' postinst (update-ca-certificates) is the flaky part in
+# minimal container base images -- isolate it and recover from a failed
+# trigger instead of letting it abort the whole layer.
+RUN apt-get update -o Acquire::Retries=3 \
+    && ( apt-get install -y --no-install-recommends ca-certificates \
+         || (dpkg --configure -a && apt-get install -y -f) ) \
+    && update-ca-certificates
+
+# ffmpeg is intentionally NOT installed here: imageio-ffmpeg==0.6.0 (a pinned
+# Python dependency of streamdiffusionv2) bundles its own static ffmpeg
+# binary, so we don't need apt's ffmpeg + its libavdevice/libavfilter/etc.
+# dependency chain at all.
+RUN apt-get install -y --no-install-recommends wget git \
     && rm -rf /var/lib/apt/lists/*
 
 # Miniconda, so we get an isolated python 3.10 matching the project's
